@@ -185,7 +185,7 @@ hr {
 }
 #column {
 	width: 600px;
-	background: #fafafa;
+	background: #f7f1e1;
 	margin: 0 auto;
 	font-size: 13px;
 	font-family: calibri,verdana;
@@ -290,6 +290,10 @@ p {
 }
 #KEEPTHIS {
 	clear: both;
+}
+#column td {
+	vertical-align: top;
+	text-align: center;
 }
 .sf {
 	display: none;
@@ -408,7 +412,7 @@ function generate() {
   const sections = buildSections(rows);
   const perRow = 3;
 
-  let body = `<div style="width: 100%; position: fixed; top: 0; left: 0;"><div id="headr"><div style="background: #fafafa; height: 85px;">
+  let body = `<div style="width: 100%; position: fixed; top: 0; left: 0;"><div id="headr"><div style="background: #f7f1e1; height: 85px;">
 
 <h1>${esc(title)}</h1>
 <h2>${esc(sub)}</h2>
