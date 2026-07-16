@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Petpage Generator</title>
+<style>
+  :root {
+    --bg: #f4f4f6;
+    --card: #ffffff;
+    --ink: #2b2b31;
+    --muted: #8a8a94;
+    --line: #e4e4ea;
+    --accent: #7c6ff0;
+    --accent-ink: #fff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  header {
+    padding: 28px 20px 8px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  header h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: .3px; }
+  header p { margin: 0; color: var(--muted); }
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 16px 20px 60px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  @media (max-width: 820px) { main { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .card h2 { margin: 0 0 10px; font-size: 14px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
+  input[type=text] {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line);
+    border-radius: 8px; font-size: 14px; color: var(--ink); background: #fbfbfd;
+  }
+  .field { flex: 1; min-width: 160px; }
+  textarea {
+    width: 100%; min-height: 220px; padding: 10px; border: 1px solid var(--line);
+    border-radius: 8px; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: #fbfbfd; color: var(--ink); resize: vertical;
+  }
+  button {
+    border: 0; border-radius: 8px; padding: 9px 16px; font-size: 14px; font-weight: 600;
+    cursor: pointer; background: var(--accent); color: var(--accent-ink);
+  }
+  button.secondary { background: #edecf9; color: var(--accent); }
+  button:active { transform: translateY(1px); }
+  .file {
+    display: inline-block; padding: 9px 16px; border: 1px dashed var(--line); border-radius: 8px;
+    cursor: pointer; background: #fbfbfd; font-size: 14px; color: var(--ink);
+  }
+  .file input { display: none; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .out-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .toast { font-size: 12px; color: var(--accent); opacity: 0; transition: opacity .2s; }
+  .toast.show { opacity: 1; }
+  .full { grid-column: 1 / -1; }
+  iframe {
+    width: 100%; height: 520px; border: 1px solid var(--line); border-radius: 8px; background: #fff;
+  }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; color: var(--accent); font-size: 13px; }
+  code { background: #f0f0f4; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🐾 Neopets Petpage Generator</h1>
+  <p>Paste or upload your template CSV, and copy the generated petpage HTML.</p>
+</header>
+
+<main>
+  <section class="card">
+    <h2>1 · Input CSV</h2>
+    <div class="row">
+      <label class="file">Upload CSV<input type="file" id="fileInput" accept=".csv,text/csv"></label>
+      <button class="secondary" id="sampleBtn" type="button">Load sample</button>
+    </div>
+    <textarea id="csvInput" placeholder="Pet Name,Info&#10;UC P2,,&#10;Dejux,Y2+ UCP2 Pinky&#10;..."></textarea>
+    <div class="row" style="margin-top:12px">
+      <div class="field">
+        <label for="titleInput">Page title</label>
+        <input type="text" id="titleInput" value="PETS UFT">
+      </div>
+      <div class="field">
+        <label for="subInput">Subtitle</label>
+        <input type="text" id="subInput" value="Thanks for stopping by!">
+      </div>
+    </div>
+    <div class="hint">
+      First row is treated as a header and skipped if it starts with <code>Pet Name</code>.
+      A blank row marks the start of a new section; the next row becomes a section heading.
+      Column 1 = pet username, column 2 = info shown under the name.
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>2 · Copy-paste output</h2>
+    <div class="out-head">
+      <span class="hint" id="statLine">&nbsp;</span>
+      <div class="row" style="margin:0">
+        <span class="toast" id="toast">Copied!</span>
+        <button id="copyBtn" type="button">Copy HTML</button>
+        <button class="secondary" id="dlBtn" type="button">Download .html</button>
+      </div>
+    </div>
+    <textarea id="htmlOutput" readonly spellcheck="false"></textarea>
+  </section>
+
+  <section class="card full">
+    <h2>Live preview</h2>
+    <iframe id="preview" title="preview"></iframe>
+  </section>
+</main>
+
+<script>
+const STYLE_BLOCK = `<style>
+body {
+	background: #eee url("http://i.imgur.com/18IaUlX.png") fixed;
+	margin-top: -16px;
+}
+a {
+	color: #aaa;
+	letter-spacing: 1px;
+	font-style: italic;
+}
+a:hover {
+	text-decoration: none;
+}
+em {
+	font-style: normal;
+	text-decoration: underline;
+	color: #333;
+}
+i {
+	letter-spacing: 1px;
+	color: #aaa;
+}
+b {
+	color: #ccc;
+}
+hr {
+	border-right: transparent 200px solid;
+	border-left: transparent 200px solid;
+	border-top: 1px #dedede solid;
+	margin: 20px;
+}
+#column h1 {
+	text-align: left;
+	letter-spacing: 5px;
+	border-bottom: 1px solid #dedede;
+	border-right: transparent 50px dotted;
+	padding-bottom: 5px;
+	margin-top: 50px;
+}
+#column h2 {
+	font-weight: normal;
+	text-align: center;
+	text-transform: uppercase;
+	font-size: 14px;
+	font-family: calibri,verdana;
+	border-bottom: 1px solid #dedede;
+	margin-top: 30px;
+	letter-spacing: 2px;
+	border-right: transparent 50px solid;
+	border-left: transparent 50px dotted;
+}
+#column {
+	width: 600px;
+	background: #fafafa;
+	margin: 0 auto;
+	font-size: 13px;
+	font-family: calibri,verdana;
+	line-height: 175%;
+	color: #555;
+}
+strong {
+	font-weight: normal;
+	display: block;
+	font-size: 17px;
+	color: #aaa;
+	line-height: 200%;
+	width: 400px;
+	margin: auto;
+	text-align: center;
+	font-style: italic;
+	text-indent: 0;
+}
+strong b {
+	font-size: 45px;
+	display: inline-block;
+	line-height: 17px;
+	height: 17px;
+	vertical-align: middle;
+	color: #e7e7e7;
+	font-style: italic;
+	padding: 0 5px;
+}
+#headr {
+	width: 620px;
+	height: 100px;
+	background: url("http://i.imgur.com/qGI3rZi.png") bottom repeat-x;
+	margin: 0 auto;
+}
+#hrban, #hlban {
+	border-top: 10px solid #eee;
+	height: 0px;
+	width: 0px;
+}
+#headr h1 {
+	font: 50px georgia;
+	line-height: 60px;
+	font-style: italic;
+	text-align: center;
+	letter-spacing: 5px;
+	margin: 0;
+	color: #aaa;
+}
+#headr h2 {
+	font: 15px georgia;
+	line-height: 100%;
+	text-align: center;
+	margin: 0;
+	color: #cdcdcd;
+}
+#scroll, #box {
+	padding: 10px;
+	border: 1px solid #cdcdcd;
+	background: #f6f6f6 url("http://i.imgur.com/qGI3rZi.png") top repeat-x;
+	margin: 25px 10px;
+}
+#scroll {
+	height: 300px;
+	overflow: auto;
+}
+img#left, img#right {
+	border: 1px solid #cdcdcd;
+	margin: 5px 10px 5px 0;
+	padding: 5px;
+	background: #f6f6f6 url("http://i.imgur.com/qGI3rZi.png") top repeat-x;
+}
+img#left {
+	float: left;
+}
+img#right {
+	float: right;
+}
+p {
+	text-indent: 50px;
+}
+#shadowr {
+	width: 700px;
+	margin: -20px auto -150px auto;
+	background: url("http://i.imgur.com/KcqCrFc.png") right repeat-y;
+}
+#shadowl {
+	margin: 0 auto;
+	background: url("http://i.imgur.com/NZlFAl7.png") left repeat-y;
+}
+#inside {
+	margin: 20px;
+	margin-bottom: 0;
+	padding: 100px 0;
+}
+#hrban {
+	border-right: 10px solid transparent;
+	float: right;
+}
+#hlban {
+	border-left: 10px solid transparent;
+	float: left;
+}
+#KEEPTHIS {
+	clear: both;
+}
+.sf {
+	display: none;
+}
+</style>`;
+
+const SAMPLE = `Pet Name,"Relevant info, in order of: [YEAR] [COLOUR/SPECIES] [P2] [OTHER INFO, such as HSD].  If tag is not relevant, leave out.","Do not include colour unless lab/fountain or expensive. Expensive classified as: void, invisible, mara, gold, pastel, robot, desert"
+UC P2,,
+Dejux,Y2+ UCP2 Pinky,
+Genosu,Y2 + UC Skeleton Pirate,
+,,
+ANCIENT ,,
+Annimu,Y2 (316+ HSD) + Chocolate Xampher,
+Buohu,Y3 +Snauberack,
+emmyinaitor,Y1 Robot Bori,
+Gogeta66,Y2,
+,,
+RW,,
+Amasser,,
+Applied,"Robot Hissi, AT",
+Beihe,CH RW/ RN North River,
+BFGBCs , +LE Skindle,
+,,
+RN,,
+Ahniko,,
+Altanak ,MTG Creature,
+Aremaki ,,
+Hyoei,JP,
+kumogashira,"Inuyasha rn, AT, Y7",
+purrua,"Y12, Water brand",
+Tanling,EN RW/ CH RN,
+Vianshi,"Y9, Hindu RN",
+Waunetta ,Y24,
+yaiselle,,`;
+
+// --- CSV parsing (RFC-4180-ish: handles quotes, escaped "" and commas) ---
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else if (c === '\r') { /* ignore */ }
+      else field += c;
+    }
+  }
+  row.push(field);
+  rows.push(row);
+  return rows;
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// --- Turn parsed rows into sections of pets ---
+function buildSections(rows) {
+  const sections = [];
+  let current = null;
+  let expectHeading = true;
+
+  rows.forEach((r, idx) => {
+    const name = (r[0] || '').trim();
+    const info = (r[1] || '').trim();
+
+    // Skip an instructional header row.
+    if (idx === 0 && /^pet name$/i.test(name)) return;
+
+    if (!name) { expectHeading = true; return; }
+
+    if (expectHeading) {
+      current = { heading: name, pets: [] };
+      sections.push(current);
+      expectHeading = false;
+      return;
+    }
+    if (!current) { current = { heading: '', pets: [] }; sections.push(current); }
+    current.pets.push({ name, info });
+  });
+
+  return sections.filter(s => s.pets.length);
+}
+
+function petCell(pet) {
+  const n = pet.name;
+  const img = `<img src="http://pets.neopets.com/cpn/${encodeURIComponent(n)}/1/2.png" border="1" width="150">`;
+  let cell = `<td>${img}<br>${esc(n)}`;
+  if (pet.info) cell += `<br>${esc(pet.info)}`;
+  cell += `</td>`;
+  return cell;
+}
+
+function sectionTable(pets, perRow) {
+  let out = `<p></p><table border="0" width="100%" cellpadding="5"><center>`;
+  for (let i = 0; i < pets.length; i++) {
+    if (i % perRow === 0) out += (i === 0 ? '<tr>' : '</tr><tr>');
+    out += petCell(pets[i]);
+  }
+  out += `</tr></center></table><div id="KEEPTHIS"></div>`;
+  return out;
+}
+
+function generate() {
+  const title = (document.getElementById('titleInput').value || '').trim();
+  const sub = (document.getElementById('subInput').value || '').trim();
+  const rows = parseCSV(document.getElementById('csvInput').value);
+  const sections = buildSections(rows);
+  const perRow = 3;
+
+  let body = `<div style="width: 100%; position: fixed; top: 0; left: 0;"><div id="headr"><div style="background: #fafafa; height: 85px;">
+
+<h1>${esc(title)}</h1>
+<h2>${esc(sub)}</h2>
+
+</div><div id="hlban"></div><div id="hrban"></div></div></div><div id="shadowr"><div id="shadowl"><div id="column"><div id="inside">
+
+<div id="KEEPTHIS"></div>
+`;
+
+  sections.forEach(s => {
+    body += `\n<h1>${esc(s.heading)}</h1>\n`;
+    body += sectionTable(s.pets, perRow) + '\n';
+  });
+
+  body += `\n\n<div style="text-align: center;"><a href="/~Mariquita">CSS</a></div></div></div></div></div>\n\n`;
+  body += STYLE_BLOCK + '\n';
+
+  const petCount = sections.reduce((a, s) => a + s.pets.length, 0);
+  document.getElementById('htmlOutput').value = body;
+  document.getElementById('statLine').textContent =
+    `${sections.length} section(s) · ${petCount} pet(s)`;
+  document.getElementById('preview').srcdoc = body;
+}
+
+// --- Wiring ---
+const csvInput = document.getElementById('csvInput');
+['input', 'change'].forEach(ev => {
+  csvInput.addEventListener(ev, generate);
+  document.getElementById('titleInput').addEventListener(ev, generate);
+  document.getElementById('subInput').addEventListener(ev, generate);
+});
+
+document.getElementById('fileInput').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => { csvInput.value = reader.result; generate(); };
+  reader.readAsText(f);
+});
+
+document.getElementById('sampleBtn').addEventListener('click', () => {
+  csvInput.value = SAMPLE; generate();
+});
+
+document.getElementById('copyBtn').addEventListener('click', async () => {
+  const ta = document.getElementById('htmlOutput');
+  try { await navigator.clipboard.writeText(ta.value); }
+  catch { ta.select(); document.execCommand('copy'); }
+  const t = document.getElementById('toast');
+  t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 1200);
+});
+
+document.getElementById('dlBtn').addEventListener('click', () => {
+  const blob = new Blob([document.getElementById('htmlOutput').value], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'petpage.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+// Start with the sample so the page is immediately useful.
+csvInput.value = SAMPLE;
+generate();
+</script>
+</body>
+</html>
